@@ -16,3 +16,14 @@ exports.employeeBody = [
 
 exports.employeeIdParam = [param('eid', 'Invalid employee ID').isMongoId()];
 exports.employeeIdQuery = [query('eid', 'Invalid employee ID').isMongoId()];
+
+const searchField = (field) =>
+  query(field, `${field} must be text (max 100 characters)`).optional().isString().trim().isLength({ max: 100 });
+
+exports.searchQuery = [
+  searchField('department'),
+  searchField('position'),
+  query('department', 'provide department and/or position to search').custom((value, { req }) => {
+    return Boolean(value || req.query.position);
+  }),
+];

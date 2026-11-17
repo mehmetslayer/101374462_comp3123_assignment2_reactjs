@@ -3,6 +3,9 @@ const Employee = require('../models/Employee');
 
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
+// escape regex special characters so user input is matched as plain text
+const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // pick only the allowed fields so the client can't set `user` or other fields
 const pickFields = (body) => {
   const { first_name, last_name, email, position, salary, date_of_joining, department } = body;
@@ -13,6 +16,21 @@ exports.getAll = async (req, res) => {
   try {
     // only the authenticated user's employees
     const employees = await Employee.find({ user: req.user._id });
+    res.status(200).json(employees);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.search = async (req, res) => {
+  try {
+    const { department, position } = req.query;
+    const filter = { user: req.user._id };
+    // case-insensitive partial match
+    if (department) filter.department = new RegExp(escapeRegex(department), 'i');
+    if (position) filter.position = new RegExp(escapeRegex(position), 'i');
+
+    const employees = await Employee.find(filter);
     res.status(200).json(employees);
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
