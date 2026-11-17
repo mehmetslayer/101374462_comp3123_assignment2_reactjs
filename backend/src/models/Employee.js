@@ -43,6 +43,11 @@ const employeeSchema = new mongoose.Schema(
       trim: true,
       maxlength: 100,
     },
+    // public path of the stored image, e.g. /uploads/<uuid>.jpg
+    profile_picture: {
+      type: String,
+      default: null,
+    },
     // the owner; set from the authenticated user, never from the request body
     user: {
       type: mongoose.Schema.Types.ObjectId,

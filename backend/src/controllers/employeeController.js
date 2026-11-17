@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Employee = require('../models/Employee');
+const { removePicture } = require('../middleware/upload');
 
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -37,14 +38,18 @@ exports.search = async (req, res) => {
   }
 };
 
+const picturePath = (file) => (file ? `/uploads/${file.filename}` : undefined);
+
 exports.create = async (req, res) => {
   try {
     const employee = await Employee.create({
       ...pickFields(req.body),
+      profile_picture: picturePath(req.file) || null,
       user: req.user._id,
     });
     res.status(201).json(employee);
   } catch (err) {
+    if (req.file) removePicture(req.file.filename);
     if (err.name === 'ValidationError') {
       return res.status(400).json({ message: err.message });
     }
@@ -74,19 +79,31 @@ exports.update = async (req, res) => {
   try {
     const { eid } = req.params;
     if (!isValidId(eid)) {
+      if (req.file) removePicture(req.file.filename);
       return res.status(400).json({ message: 'Invalid employee ID' });
     }
 
-    const employee = await Employee.findOneAndUpdate(
-      { _id: eid, user: req.user._id },
-      pickFields(req.body),
-      { new: true, runValidators: true }
-    );
-    if (!employee) {
+    // ownership check before anything changes
+    const existing = await Employee.findOne({ _id: eid, user: req.user._id });
+    if (!existing) {
+      if (req.file) removePicture(req.file.filename);
       return res.status(404).json({ message: 'Employee not found' });
     }
+
+    const updates = pickFields(req.body);
+    if (req.file) updates.profile_picture = picturePath(req.file);
+
+    const employee = await Employee.findOneAndUpdate(
+      { _id: eid, user: req.user._id },
+      updates,
+      { new: true, runValidators: true }
+    );
+
+    // the new picture is saved, so the old file is no longer needed
+    if (req.file && existing.profile_picture) removePicture(existing.profile_picture);
     res.status(200).json(employee);
   } catch (err) {
+    if (req.file) removePicture(req.file.filename);
     if (err.name === 'ValidationError') {
       return res.status(400).json({ message: err.message });
     }
@@ -106,6 +123,7 @@ exports.remove = async (req, res) => {
     if (!employee) {
       return res.status(404).json({ message: 'Employee not found' });
     }
+    removePicture(employee.profile_picture);
     res.status(204).send();
   } catch (err) {
     res.status(500).json({ message: 'Server error' });

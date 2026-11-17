@@ -1,5 +1,6 @@
 const express = require('express');
 const helmet = require('helmet');
+const cors = require('cors');
 const morgan = require('morgan');
 const mongoose = require('mongoose');
 const connectDB = require('./src/config/db');
@@ -8,13 +9,22 @@ const userRoutes = require('./src/routes/userRoutes');
 const employeeRoutes = require('./src/routes/employeeRoutes');
 const { generalLimiter } = require('./src/middleware/rateLimiter');
 const errorHandler = require('./src/middleware/errorHandler');
+const { UPLOAD_DIR } = require('./src/middleware/upload');
 
 const app = express();
 
 // behind Vercel's proxy, trust it so rate limiting sees the real client IP
 if (process.env.VERCEL) app.set('trust proxy', 1);
 
-app.use(helmet()); // secure HTTP headers
+// cross-origin so the React app (another origin) can display the images
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+
+// only the frontend origin may call the API from a browser
+app.use(cors({
+  origin: process.env.CORS_ORIGIN,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express.json()); // parse json bodies into req.body
 
 // request log: method, path, status, time (no headers or bodies, so no tokens/passwords)
@@ -41,6 +51,9 @@ app.get('/health', (req, res) => {
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
   });
 });
+
+// uploaded profile pictures
+app.use('/uploads', express.static(UPLOAD_DIR));
 
 app.use('/api', generalLimiter);
 app.use('/api/v1/user', userRoutes);

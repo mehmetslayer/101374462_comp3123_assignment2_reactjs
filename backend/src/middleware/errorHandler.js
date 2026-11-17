@@ -1,3 +1,4 @@
+const multer = require('multer');
 const logger = require('../utils/logger');
 
 // Express identifies error handlers by the 4 arguments
@@ -5,6 +6,16 @@ module.exports = (err, req, res, next) => {
   if (err.type === 'entity.parse.failed') {
     logger.warn(`Malformed JSON: ${req.method} ${req.originalUrl}`);
     return res.status(400).json({ message: 'Malformed JSON in request body' });
+  }
+
+  if (err instanceof multer.MulterError || err.code === 'INVALID_FILE_TYPE') {
+    const message = err.code === 'LIMIT_FILE_SIZE'
+      ? 'Profile picture must be 2 MB or smaller'
+      : err.code === 'INVALID_FILE_TYPE'
+        ? err.message
+        : 'Invalid file upload';
+    logger.warn(`Upload rejected: ${req.method} ${req.originalUrl} (${err.code})`);
+    return res.status(400).json({ message });
   }
 
   logger.error(`${req.method} ${req.originalUrl}: ${err.message}`);
