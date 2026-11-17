@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import NavBar from './components/NavBar';
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicOnlyRoute from './components/PublicOnlyRoute';
+import EmployeeDetails from './pages/EmployeeDetails';
+import EmployeeForm from './pages/EmployeeForm';
 import EmployeeList from './pages/EmployeeList';
 import Login from './pages/Login';
 import NotFound from './pages/NotFound';
@@ -23,6 +25,9 @@ export default function App() {
 
           <Route element={<ProtectedRoute />}>
             <Route path="/employees" element={<EmployeeList />} />
+            <Route path="/employees/add" element={<EmployeeForm />} />
+            <Route path="/employees/:id" element={<EmployeeDetails />} />
+            <Route path="/employees/:id/edit" element={<EmployeeForm />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />
