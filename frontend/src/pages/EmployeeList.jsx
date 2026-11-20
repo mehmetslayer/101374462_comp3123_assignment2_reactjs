@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, ButtonGroup, Card, Col, Form, Row, Spinner, Table } from 'react-bootstrap';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { deleteEmployee, getEmployees, searchEmployees } from '../api/employees';
@@ -23,26 +23,37 @@ export default function EmployeeList() {
   const [toDelete, setToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  const debounceTimer = useRef(null);
+  const latestRequest = useRef(0);
+
   const load = async (params) => {
+    // ignore a slower, older response that arrives after a newer one
+    const requestId = ++latestRequest.current;
     setLoading(true);
     setError('');
     try {
       const { data } = params ? await searchEmployees(params) : await getEmployees();
+      if (requestId !== latestRequest.current) return;
       setEmployees(data);
       setActiveSearch(params ?? null);
     } catch (err) {
+      if (requestId !== latestRequest.current) return;
       setError(errorMessage(err, 'Could not load employees.'));
     } finally {
-      setLoading(false);
+      if (requestId === latestRequest.current) setLoading(false);
     }
   };
 
+  useEffect(() => () => clearTimeout(debounceTimer.current), []);
+
   // first load; state is only set in the promise callbacks
   useEffect(() => {
+    const requestId = ++latestRequest.current;
+    const isLatest = () => requestId === latestRequest.current;
     getEmployees()
-      .then(({ data }) => setEmployees(data))
-      .catch((err) => setError(errorMessage(err, 'Could not load employees.')))
-      .finally(() => setLoading(false));
+      .then(({ data }) => isLatest() && setEmployees(data))
+      .catch((err) => isLatest() && setError(errorMessage(err, 'Could not load employees.')))
+      .finally(() => isLatest() && setLoading(false));
   }, []);
 
   // clear the success message from history so a refresh does not show it again
@@ -50,12 +61,30 @@ export default function EmployeeList() {
     if (location.state?.message) navigate(location.pathname, { replace: true, state: null });
   }, [location.pathname, location.state, navigate]);
 
+  const toParams = (values) => {
+    const params = {};
+    if (values.department.trim()) params.department = values.department.trim();
+    if (values.position.trim()) params.position = values.position.trim();
+    return params;
+  };
+
+  // search while typing, but only after the user stops for 400 ms (not on every keystroke)
+  const handleSearchChange = (field, value) => {
+    const next = { ...search, [field]: value };
+    setSearch(next);
+    setSearchError('');
+    clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      const params = toParams(next);
+      if (params.department || params.position) load(params);
+      else if (activeSearch) load(); // both fields emptied: back to the full list
+    }, 400);
+  };
+
   const handleSearch = (e) => {
     e.preventDefault();
-    const params = {};
-    if (search.department.trim()) params.department = search.department.trim();
-    if (search.position.trim()) params.position = search.position.trim();
-
+    clearTimeout(debounceTimer.current);
+    const params = toParams(search);
     if (!params.department && !params.position) {
       setSearchError('Enter a department or a position to search.');
       return;
@@ -65,6 +94,7 @@ export default function EmployeeList() {
   };
 
   const clearSearch = () => {
+    clearTimeout(debounceTimer.current);
     setSearch({ department: '', position: '' });
     setSearchError('');
     load();
@@ -107,7 +137,7 @@ export default function EmployeeList() {
                   <Form.Label>Department</Form.Label>
                   <Form.Control
                     value={search.department}
-                    onChange={(e) => setSearch({ ...search, department: e.target.value })}
+                    onChange={(e) => handleSearchChange('department', e.target.value)}
                     placeholder="e.g. IT"
                     isInvalid={Boolean(searchError)}
                   />
@@ -118,7 +148,7 @@ export default function EmployeeList() {
                   <Form.Label>Position</Form.Label>
                   <Form.Control
                     value={search.position}
-                    onChange={(e) => setSearch({ ...search, position: e.target.value })}
+                    onChange={(e) => handleSearchChange('position', e.target.value)}
                     placeholder="e.g. Developer"
                     isInvalid={Boolean(searchError)}
                   />

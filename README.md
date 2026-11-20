@@ -76,7 +76,7 @@ flowchart LR
 │   ├── nginx.conf            # SPA fallback to index.html
 │   └── src/
 │       ├── api/              # axios client, auth and employee calls
-│       ├── components/       # NavBar, ProtectedRoute, PublicOnlyRoute, Avatar, ConfirmDeleteModal
+│       ├── components/       # NavBar, ProtectedRoute, PublicOnlyRoute, Avatar, ConfirmDeleteModal, ErrorBoundary
 │       ├── context/          # AuthContext (session state)
 │       ├── pages/            # Login, Signup, EmployeeList, EmployeeForm, EmployeeDetails, NotFound
 │       └── utils/            # validation, formatting, error messages
@@ -246,7 +246,8 @@ Error codes: `400` validation error or bad id, `401` missing, invalid or expired
 - `AuthContext` holds the token and username, exposes `login` and `logout`, and listens for the `auth:expired` event from the Axios client.
 - `api/client.js` is the shared Axios instance: base URL from `VITE_API_URL`, request interceptor for the token, response interceptor for expired sessions.
 - `EmployeeForm` is used for both add and edit. It validates fields, checks the image type and size before upload, shows a preview, and sends `FormData`.
-- `EmployeeList` shows the table, the search form (department and/or position), result counts, empty states, and a confirmation modal before deleting.
+- `EmployeeList` shows the table, the search form (department and/or position), result counts, empty states, and a confirmation modal before deleting. Search runs 400 ms after the user stops typing (debounced), or right away with the Search button or Enter. Clearing both fields or pressing Clear returns to the full list.
+- `ErrorBoundary` is a class component (React only supports error boundaries as classes). If a page crashes while rendering, it shows a friendly message instead of a blank screen.
 - `utils/errorMessage.js` turns API errors (network, 400, 401, 404, 409, 429, 500) into short messages for the user.
 
 ## Logging and health check
